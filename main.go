@@ -2,11 +2,12 @@ package main
 
 import (
 	"log"
-	"time"
 	"os"
-	"github.com/valyala/fasthttp"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/valyala/fasthttp"
 )
 
 var timeout, _ = strconv.Atoi(os.Getenv("TIMEOUT"))
@@ -17,9 +18,9 @@ var client *fasthttp.Client
 
 func main() {
 	h := requestHandler
-	
+
 	client = &fasthttp.Client{
-		ReadTimeout: time.Duration(timeout) * time.Second,
+		ReadTimeout:         time.Duration(timeout) * time.Second,
 		MaxIdleConnDuration: 60 * time.Second,
 	}
 
@@ -29,6 +30,16 @@ func main() {
 }
 
 func requestHandler(ctx *fasthttp.RequestCtx) {
+	// Handle CORS preflight requests
+	if string(ctx.Method()) == "OPTIONS" {
+		ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+		ctx.Response.Header.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		ctx.SetStatusCode(fasthttp.StatusNoContent)
+		return
+	}
+
+	// Handle regular requests
 	val, ok := os.LookupEnv("KEY")
 
 	if ok && string(ctx.Request.Header.Peek("PROXYKEY")) != val {
@@ -46,6 +57,11 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 	response := makeRequest(ctx, 1)
 
 	defer fasthttp.ReleaseResponse(response)
+
+	// Add CORS headers to the response
+	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+	ctx.Response.Header.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 	body := response.Body()
 	ctx.SetBody(body)
