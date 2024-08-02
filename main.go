@@ -32,16 +32,13 @@ func main() {
 func requestHandler(ctx *fasthttp.RequestCtx) {
 	// Handle CORS preflight requests
 	if string(ctx.Method()) == "OPTIONS" {
-		ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
-		ctx.Response.Header.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		handleCORS(ctx)
 		ctx.SetStatusCode(fasthttp.StatusNoContent)
 		return
 	}
 
 	// Handle regular requests
 	val, ok := os.LookupEnv("KEY")
-
 	if ok && string(ctx.Request.Header.Peek("PROXYKEY")) != val {
 		ctx.SetStatusCode(407)
 		ctx.SetBody([]byte("Missing or invalid PROXYKEY header."))
@@ -59,9 +56,7 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 	defer fasthttp.ReleaseResponse(response)
 
 	// Add CORS headers to the response
-	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
-	ctx.Response.Header.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	handleCORS(ctx)
 
 	body := response.Body()
 	ctx.SetBody(body)
@@ -71,12 +66,17 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 	})
 }
 
+func handleCORS(ctx *fasthttp.RequestCtx) {
+	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+	ctx.Response.Header.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	ctx.Response.Header.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+}
+
 func makeRequest(ctx *fasthttp.RequestCtx, attempt int) *fasthttp.Response {
 	if attempt > retries {
 		resp := fasthttp.AcquireResponse()
 		resp.SetBody([]byte("Proxy failed to connect. Please try again."))
 		resp.SetStatusCode(500)
-
 		return resp
 	}
 
